@@ -27,7 +27,7 @@ def main(args):
     transactions = pd.concat(transactionList, axis=0, ignore_index=True)
 
     rows_list = []
-    for index, row in transactions.iterrows():
+    for _, row in transactions.iterrows():
         if isinstance(row["Ticker Symbol"], str):
             try:
                 transactionDate = datetime.strptime(row["Date"], "%Y-%m-%dT%H:%M:%S")
@@ -46,11 +46,12 @@ def main(args):
             transaction.update(
                 {
                     "Date": transactionDate,
-                    "Type": row["Type"],
+                    "Type": getTransactionType(row["Type"]),
                     "Value": value,
                     "Transaction Currency": "EUR",
                     "Shares": shares,
                     "Ticker Symbol": benchmark.ticker,
+                    "Security Name": "Benchmark - %s" % benchmark.info['shortName']
                 }
             )
 
@@ -74,6 +75,14 @@ def getHistory(benchmark_history, transaction_date):
 
     return result
 
+def getTransactionType(type: str) -> str:
+    match type:
+        case "Buy" | "Transfer (Inbound)" | "Delivery (Inbound)":
+            return "Buy"
+        case "Sell" | "Transfer (Outbound)" | "Delivery (Outbound)":
+            return "Sell"
+        case _:
+            raise Exception("Unknown type %s" % type)
 
 if __name__ == "__main__":
     logging.basicConfig(format="%(levelname)s %(asctime)s %(message)s", level="INFO")
