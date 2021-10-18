@@ -20,7 +20,9 @@ def main(args):
         fileList = glob.glob(args.input_dir + "/*.csv")
 
     for filename in fileList:
-        transactionList.append(pd.read_csv(filename, sep=";", thousands=".", decimal=","))
+        transactionList.append(
+            pd.read_csv(filename, sep=";", thousands=".", decimal=",")
+        )
 
     transactions = pd.concat(transactionList, axis=0, ignore_index=True)
 
@@ -36,18 +38,19 @@ def main(args):
 
             history_row = getHistory(benchmarkHistory, transactionDate)
 
-            value = row['Value']
-            price = history_row.iloc[0]['Close']
+            value = row["Value"]
+            price = history_row.iloc[0]["Close"]
             shares = value / price
 
             transaction = {}
-            transaction.update({
-                'Date': transactionDate,
-                'Type': row["Type"],
-                'Value': value,
-                'Transaction Currency': 'EUR',
-                'Shares': shares,
-                'Ticker Symbol': benchmark.ticker
+            transaction.update(
+                {
+                    "Date": transactionDate,
+                    "Type": row["Type"],
+                    "Value": value,
+                    "Transaction Currency": "EUR",
+                    "Shares": shares,
+                    "Ticker Symbol": benchmark.ticker,
                 }
             )
 
@@ -71,19 +74,21 @@ def getHistory(benchmark_history, transaction_date):
 
     return result
 
+
 if __name__ == "__main__":
-    logging.basicConfig(
-        format='%(levelname)s %(asctime)s %(message)s',
-        level="INFO"
-        )
+    logging.basicConfig(format="%(levelname)s %(asctime)s %(message)s", level="INFO")
 
     parser = argparse.ArgumentParser()
 
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--input", default=None, help="Path to one transactions file")
-    group.add_argument("--input-dir", default=None, help="Path to directory with transaction files")
+    group.add_argument(
+        "--input-dir", default=None, help="Path to directory with transaction files"
+    )
 
-    parser.add_argument("--benchmark", required=False, default="VWCE.DE", help="Benchmark ticker")
+    parser.add_argument(
+        "--benchmark", required=False, default="VWCE.DE", help="Benchmark ticker"
+    )
     parser.add_argument("--output", required=True, help="Output CSV file")
     args = parser.parse_args()
     main(args)
