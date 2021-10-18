@@ -1,5 +1,6 @@
 import argparse
 from datetime import datetime, timedelta
+import glob
 import logging
 import logging.config
 import pandas as pd
@@ -10,21 +11,32 @@ def main(args):
     benchmark = yf.Ticker(args.benchmark)
     benchmarkHistory = benchmark.history(period="max")
 
-    transactions = pd.read_csv(args.input, sep=";", index_col="Date", thousands=".", decimal=",")
+    fileList = []
+    transactionList = []
+    if args.input:
+        fileList.append(args.input)
+
+    if args.input_dir:
+        fileList = glob.glob(args.input_dir + "/*.csv")
+
+    for filename in fileList:
+        transactionList.append(pd.read_csv(filename, sep=";", thousands=".", decimal=","))
+
+    transactions = pd.concat(transactionList, axis=0, ignore_index=True)
 
     rows_list = []
     for index, row in transactions.iterrows():
         if isinstance(row["Ticker Symbol"], str):
             try:
-                transactionDate = datetime.strptime(index, "%Y-%m-%dT%H:%M:%S")
+                transactionDate = datetime.strptime(row["Date"], "%Y-%m-%dT%H:%M:%S")
             except ValueError:
-                transactionDate = datetime.strptime(index, "%Y-%m-%dT%H:%M")
+                transactionDate = datetime.strptime(row["Date"], "%Y-%m-%dT%H:%M")
 
             transactionDate = transactionDate.replace(hour=0, minute=0, second=0)
 
             history_row = getHistory(benchmarkHistory, transactionDate)
 
-            value = row['Value'] * -1
+            value = row['Value']
             price = history_row.iloc[0]['Close']
             shares = value / price
 
@@ -66,7 +78,11 @@ if __name__ == "__main__":
         )
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input", required=True, help="Path to transactions file")
+
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("--input", default=None, help="Path to one transactions file")
+    group.add_argument("--input-dir", default=None, help="Path to directory with transaction files")
+
     parser.add_argument("--benchmark", required=False, default="VWCE.DE", help="Benchmark ticker")
     parser.add_argument("--output", required=True, help="Output CSV file")
     args = parser.parse_args()
