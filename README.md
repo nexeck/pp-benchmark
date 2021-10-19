@@ -5,7 +5,7 @@
 Export Portfolio Performance security account transactions as CSV.
 
 ```sh
-make run ARGS="--input .tmp/FIRE.csv --output .tmp/out.csv"
+make run ARGS="--input .tmp/test/ING.csv --output .tmp/out.csv --benchmark VWCE.DE:100"
 ```
 
 For multiple csv files (Export of multiple security accounts)

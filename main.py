@@ -132,7 +132,7 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--benchmark", action="append", type=benchmarkType, help="Benchmark ticker"
+        "--benchmark", required=True, action="append", type=benchmarkType, help="Benchmark ticker"
     )
 
     parser.add_argument("--output", required=True, help="Output CSV file")
