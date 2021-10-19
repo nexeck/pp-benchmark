@@ -1,15 +1,46 @@
 import argparse
 from datetime import datetime, timedelta
+import decimal
 import glob
 import logging
 import logging.config
+import re
 import pandas as pd
 import yfinance as yf
 
+class Validator(object):
+
+    def __init__(self, pattern):
+        self._pattern = re.compile(pattern)
+
+    def __call__(self, value):
+        if not self._pattern.match(value):
+            raise argparse.ArgumentTypeError(
+                "Argument has to match '{}'".format(self._pattern.pattern))
+        return value
 
 def main(args):
-    benchmark = yf.Ticker(args.benchmark)
-    benchmarkHistory = benchmark.history(period="max")
+    benchmarks = []
+    totalRatio = 0
+    for benchmark in args.benchmark:
+        benchmark = benchmark.split(":")
+        ticker = benchmark[0]
+        ratio = float(benchmark[1])
+
+        benchmarkData = yf.Ticker(ticker)
+        benchmarkHistory = benchmarkData.history(period="max", interval="1d")
+
+        totalRatio += ratio
+
+        benchmarks.append({
+                'ticker': benchmarkData.ticker,
+                'shortName': benchmarkData.info['shortName'],
+                'ratio': ratio,
+                'history': benchmarkHistory
+                })
+
+    if totalRatio != 100:
+        raise Exception("Total ratio %s <> 100" % totalRatio)
 
     fileList = []
     transactionList = []
@@ -36,26 +67,27 @@ def main(args):
 
             transactionDate = transactionDate.replace(hour=0, minute=0, second=0)
 
-            history_row = getHistory(benchmarkHistory, transactionDate)
+            for benchmark in benchmarks:
+                history_row = getHistory(benchmark['history'], transactionDate)
 
-            value = row["Value"]
-            price = history_row.iloc[0]["Close"]
-            shares = value / price
+                value = row["Value"] / 100 * benchmark['ratio']
+                price = history_row.iloc[0]["Close"]
+                shares = value / price
 
-            transaction = {}
-            transaction.update(
-                {
-                    "Date": transactionDate,
-                    "Type": getTransactionType(row["Type"]),
-                    "Value": value,
-                    "Transaction Currency": "EUR",
-                    "Shares": shares,
-                    "Ticker Symbol": benchmark.ticker,
-                    "Security Name": "Benchmark - %s" % benchmark.info['shortName']
-                }
-            )
+                transaction = {}
+                transaction.update(
+                    {
+                        "Date": transactionDate,
+                        "Type": getTransactionType(row["Type"]),
+                        "Value": value,
+                        "Transaction Currency": "EUR",
+                        "Shares": shares,
+                        "Ticker Symbol": benchmark['ticker'],
+                        "Security Name": "Benchmark - %s" % benchmark['shortName']
+                    }
+                )
 
-            rows_list.append(transaction)
+                rows_list.append(transaction)
 
     benchmarkTransactions = pd.DataFrame(rows_list)
     benchmarkTransactions.to_csv(args.output, index=False, sep=";", decimal=",")
@@ -87,17 +119,20 @@ def getTransactionType(type: str) -> str:
 if __name__ == "__main__":
     logging.basicConfig(format="%(levelname)s %(asctime)s %(message)s", level="INFO")
 
+    benchmarkType = Validator(r"^[A-Z0-9]+(\.[A-Z]+)?:\d+$")
+
     parser = argparse.ArgumentParser()
 
-    group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("--input", default=None, help="Path to one transactions file")
-    group.add_argument(
+    input_group = parser.add_mutually_exclusive_group(required=True)
+    input_group.add_argument("--input", default=None, help="Path to one transactions file")
+    input_group.add_argument(
         "--input-dir", default=None, help="Path to directory with transaction files"
     )
 
     parser.add_argument(
-        "--benchmark", required=False, default="VWCE.DE", help="Benchmark ticker"
+        "--benchmark", action="append", type=benchmarkType, help="Benchmark ticker"
     )
+
     parser.add_argument("--output", required=True, help="Output CSV file")
     args = parser.parse_args()
     main(args)
