@@ -1,6 +1,5 @@
 import argparse
 from datetime import datetime, timedelta
-import decimal
 import glob
 import logging
 import logging.config
@@ -20,27 +19,30 @@ class Validator(object):
         return value
 
 def main(args):
-    benchmarks = []
+    benchmarkList = []
     totalRatio = 0
     for benchmark in args.benchmark:
         benchmark = benchmark.split(":")
         ticker = benchmark[0]
         ratio = float(benchmark[1])
-
-        benchmarkData = yf.Ticker(ticker)
-        benchmarkHistory = benchmarkData.history(period="max", interval="1d")
+        benchmarkList.append({'ticker': ticker, 'ratio': ratio})
 
         totalRatio += ratio
 
-        benchmarks.append({
-                'ticker': benchmarkData.ticker,
-                'shortName': benchmarkData.info['shortName'],
-                'ratio': ratio,
-                'history': benchmarkHistory
-                })
-
     if totalRatio != 100:
         raise Exception("Total ratio %s <> 100" % totalRatio)
+
+    benchmarkDataList = []
+    for benchmark in benchmarkList:
+        benchmarkData = yf.Ticker(benchmark['ticker'])
+        benchmarkHistory = benchmarkData.history(period="max", interval="1d")
+
+        benchmarkDataList.append({
+                'ticker': benchmarkData.ticker,
+                'shortName': benchmarkData.info['shortName'],
+                'ratio': benchmark['ratio'],
+                'history': benchmarkHistory
+                })
 
     fileList = []
     transactionList = []
@@ -67,10 +69,10 @@ def main(args):
 
             transactionDate = transactionDate.replace(hour=0, minute=0, second=0)
 
-            for benchmark in benchmarks:
-                history_row = getHistory(benchmark['history'], transactionDate)
+            for benchmarkData in benchmarkDataList:
+                history_row = getHistory(benchmarkData['history'], transactionDate)
 
-                value = row["Value"] / 100 * benchmark['ratio']
+                value = row["Value"] / 100 * benchmarkData['ratio']
                 price = history_row.iloc[0]["Close"]
                 shares = value / price
 
@@ -82,8 +84,8 @@ def main(args):
                         "Value": value,
                         "Transaction Currency": "EUR",
                         "Shares": shares,
-                        "Ticker Symbol": benchmark['ticker'],
-                        "Security Name": "Benchmark - %s" % benchmark['shortName']
+                        "Ticker Symbol": benchmarkData['ticker'],
+                        "Security Name": "Benchmark - %s" % benchmarkData['shortName']
                     }
                 )
 
@@ -119,7 +121,7 @@ def getTransactionType(type: str) -> str:
 if __name__ == "__main__":
     logging.basicConfig(format="%(levelname)s %(asctime)s %(message)s", level="INFO")
 
-    benchmarkType = Validator(r"^[A-Z0-9]+(\.[A-Z]+)?:\d+$")
+    benchmarkType = Validator(r"^[A-Z0-9]+(\.[A-Z]+)?:([0-9]*[.])?[0-9]+$")
 
     parser = argparse.ArgumentParser()
 
