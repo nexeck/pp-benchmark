@@ -2,7 +2,9 @@
 
 ## Usage
 
-Export Portfolio Performance security account transactions as CSV.
+Export Portfolio Performance security account transactions as CSV
+
+For a single csv file
 
 ```sh
 make run ARGS="--input .tmp/test/ING.csv --output .tmp/out.csv --benchmark VWCE.DE:100"
